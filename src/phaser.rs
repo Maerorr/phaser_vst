@@ -98,7 +98,8 @@ impl Phaser {
         self.left_feedback_buffer.rotate_right(1);
         self.left_feedback_buffer[0] = phased_signal;
 
-        y = x + self.intensity * phased_signal;
+        let x_gain = 1.0 - self.intensity / 2.0;
+        y = x_gain * x + self.intensity / 2.0 * phased_signal;
         y
     }
 
@@ -123,7 +124,8 @@ impl Phaser {
 
         // do this once, in right channel since both channels share a common
         self.lfo.update_lfo();
-        y = x + self.intensity * phased_signal;
+        let x_gain = 1.0 - self.intensity / 2.0;
+        y = x_gain * x + self.intensity / 2.0 * phased_signal;
         y
     }
     

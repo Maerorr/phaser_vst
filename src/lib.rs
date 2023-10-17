@@ -17,6 +17,7 @@ const MAX_BLOCK_SIZE: usize = 64;
 struct PhaserPlugin {
     params: Arc<PhaserPluginParams>,
     phaser: phaser::Phaser,
+    output_hpf: filter::BiquadFilter,
     sample_rate: f32,
 }
 
@@ -50,6 +51,7 @@ impl Default for PhaserPlugin {
             params: Arc::new(PhaserPluginParams::default()),
             phaser: phaser::Phaser::new(44100.0),
             sample_rate: 44100.0,
+            output_hpf: filter::BiquadFilter::new(),
         }
     }
 }
@@ -73,7 +75,7 @@ impl Default for PhaserPluginParams {
             .with_unit("Hz")
             .with_value_to_string(formatters::v2s_f32_rounded(2)),
 
-            feedback: FloatParam::new("Feedback", 0.0, FloatRange::Linear { min: 0.0, max: 0.999 })
+            feedback: FloatParam::new("Feedback", 0.0, FloatRange::Linear { min: 0.0, max: 0.9 })
             .with_unit("%")
             .with_value_to_string(formatters::v2s_f32_percentage(1))
             .with_string_to_value(formatters::s2v_f32_percentage()),
@@ -136,6 +138,8 @@ impl Plugin for PhaserPlugin {
         _context: &mut impl InitContext<Self>,
     ) -> bool {
         self.sample_rate = _buffer_config.sample_rate as f32;
+        self.output_hpf.set_sample_rate(self.sample_rate);
+        self.output_hpf.second_order_hpf_coefficients(self.sample_rate, 25.0, 0.8);
         // Resize buffers and perform other potentially expensive initialization operations here.
         // The `reset()` function is always called right after this function. You can remove this
         // function if you do not need it.
@@ -175,8 +179,10 @@ impl Plugin for PhaserPlugin {
             for (num, sample) in channel_samples.into_iter().enumerate() {
                 if num == 0 {
                     *sample = self.phaser.process_left(*sample);
+                    *sample = self.output_hpf.process_left(*sample);
                 } else {
                     *sample = self.phaser.process_right(*sample);
+                    *sample = self.output_hpf.process_left(*sample);
                 }
             }
         }
